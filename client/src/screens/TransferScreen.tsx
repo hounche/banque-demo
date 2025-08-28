@@ -10,13 +10,28 @@ export default function TransferScreen({ navigation }: any) {
   const [to, setTo] = useState<string | undefined>(undefined);
   const [amount, setAmount] = useState<string>('');
 
-  useEffect(() => { getAccounts().then(acc => { setAccounts(acc); if (acc[0]) setFrom(acc[0].id); if (acc[1]) setTo(acc[1].id); }); }, []);
+  const [fromMenuVisible, setFromMenuVisible] = useState(false);
+  const [toMenuVisible, setToMenuVisible] = useState(false);
+
+  useEffect(() => {
+    getAccounts().then(acc => {
+      setAccounts(acc);
+      if (acc[0] && !from) setFrom(acc[0].id);
+      if (acc[1] && !to) setTo(acc[1].id);
+    }).catch(e => Alert.alert('Erreur', e.message || 'Impossible de charger les comptes'));
+  }, []);
 
   const doTransfer = async () => {
     try {
       if (!from || !to) return Alert.alert('Erreur', 'Sélectionne les comptes source et destination.');
       if (from === to) return Alert.alert('Erreur', 'Les comptes doivent être différents.');
       const amt = parseFloat(amount);
+      if (isNaN(amt) || amt <= 0) return Alert.alert('Erreur', 'Montant invalide.');
+
+      const fromAcc = accounts.find(a => a.id === from);
+      if (!fromAcc) return Alert.alert('Erreur', 'Compte source introuvable.');
+      if (fromAcc.balance < amt) return Alert.alert('Erreur', "Fonds insuffisants.");
+
       await transfer(from, to, amt);
       Alert.alert('Succès', 'Virement effectué.');
       navigation.navigate('Dashboard');
@@ -25,16 +40,23 @@ export default function TransferScreen({ navigation }: any) {
     }
   };
 
+  const fromLabel = accounts.find(a => a.id === from)?.name ?? 'Sélectionner';
+  const toLabel = accounts.find(a => a.id === to)?.name ?? 'Sélectionner';
+
   return (
     <View style={styles.container}>
       <Text style={styles.label}>Depuis</Text>
-      <Menu visible={false} onDismiss={() => {}} anchor={<TextInput value={from ?? ''} editable={false} />}> 
-        {accounts.map(a => <Menu.Item key={a.id} title={`${a.name} (${a.balance.toFixed(2)}€)`} onPress={() => setFrom(a.id)} />)}
+      <Menu visible={fromMenuVisible} onDismiss={() => setFromMenuVisible(false)} anchor={<Button mode="outlined" onPress={() => setFromMenuVisible(true)}>{fromLabel}</Button>}>
+        {accounts.map(a => (
+          <Menu.Item key={a.id} title={`${a.name} (${a.balance.toFixed(2)}€)`} onPress={() => { setFrom(a.id); setFromMenuVisible(false); }} />
+        ))}
       </Menu>
 
       <Text style={styles.label}>Vers</Text>
-      <Menu visible={false} onDismiss={() => {}} anchor={<TextInput value={to ?? ''} editable={false} />}> 
-        {accounts.map(a => <Menu.Item key={a.id} title={`${a.name} (${a.balance.toFixed(2)}€)`} onPress={() => setTo(a.id)} />)}
+      <Menu visible={toMenuVisible} onDismiss={() => setToMenuVisible(false)} anchor={<Button mode="outlined" onPress={() => setToMenuVisible(true)}>{toLabel}</Button>}>
+        {accounts.map(a => (
+          <Menu.Item key={a.id} title={`${a.name} (${a.balance.toFixed(2)}€)`} onPress={() => { setTo(a.id); setToMenuVisible(false); }} />
+        ))}
       </Menu>
 
       <Text style={styles.label}>Montant</Text>
